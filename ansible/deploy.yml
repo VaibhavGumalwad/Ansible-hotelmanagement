@@ -1,0 +1,78 @@
+---
+- name: Deploy Hotel Booking App
+  hosts: app_servers
+  become: yes
+
+  vars:
+    ecr_registry: "{{ lookup('env', 'ECR_REGISTRY') }}"
+    image_tag: "{{ lookup('env', 'IMAGE_TAG') | default('latest') }}"
+    rds_endpoint: "{{ lookup('env', 'RDS_ENDPOINT') }}"
+    db_username: "{{ lookup('env', 'DB_USERNAME') }}"
+    db_password: "{{ lookup('env', 'DB_PASSWORD') }}"
+    jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
+    aws_region: "us-east-1"
+
+  tasks:
+    - name: Install Docker
+      yum:
+        name: docker
+        state: present
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-Linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Install AWS CLI
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip -o awscliv2.zip
+        ./aws/install --update
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Login to ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | \
+        docker login --username AWS --password-stdin {{ ecr_registry }}
+
+    - name: Create app directory
+      file:
+        path: /opt/hotel-booking
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker-compose file
+      template:
+        src: docker-compose.yml.j2
+        dest: /opt/hotel-booking/docker-compose.yml
+
+    - name: Pull latest Docker images
+      shell: |
+        cd /opt/hotel-booking
+        docker-compose pull
+
+    - name: Stop existing containers
+      shell: |
+        cd /opt/hotel-booking
+        docker-compose down || true
+
+    - name: Start containers
+      shell: |
+        cd /opt/hotel-booking
+        docker-compose up -d
+
+    - name: Verify containers are running
+      shell: docker ps
+      register: docker_status
+
+    - name: Show running containers
+      debug:
+        msg: "{{ docker_status.stdout }}"

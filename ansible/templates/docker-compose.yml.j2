@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    image: {{ ecr_registry }}/hotel-booking-backend:{{ image_tag }}
+    container_name: hotel-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://{{ rds_endpoint }}/hotel_booking_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME={{ db_username }}
+      - SPRING_DATASOURCE_PASSWORD={{ db_password }}
+      - JWT_SECRET={{ jwt_secret }}
+    restart: always
+    networks:
+      - hotel-network
+
+  frontend:
+    image: {{ ecr_registry }}/hotel-booking-frontend:{{ image_tag }}
+    container_name: hotel-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - hotel-network
+
+networks:
+  hotel-network:
+    driver: bridge
