@@ -28,13 +28,7 @@ resource "aws_instance" "jenkins_server" {
     yum install -y docker git
     systemctl start docker
     systemctl enable docker
-    # Install Jenkins
-    wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
-    rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-    yum install -y java-17-amazon-corretto jenkins
-    systemctl start jenkins
-    systemctl enable jenkins
-    usermod -aG docker jenkins
+    
     # Install Ansible
     amazon-linux-extras install -y ansible2
     # Install Terraform
