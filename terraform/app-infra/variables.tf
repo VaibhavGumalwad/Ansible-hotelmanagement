@@ -7,7 +7,7 @@ variable "project_name" {
 }
 
 variable "instance_type" {
-  default = "t2.micro"
+  default = "t3.medium"
 }
 
 variable "db_username" {
@@ -15,11 +15,9 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  default     = "Hotel12345"
+  description = "RDS master password - passed in from Jenkins credentials at runtime"
   sensitive   = true
+  # No default - must be supplied via -var flag in Jenkins pipeline
 }
 
-variable "key_name" {
-  description = "EC2 Key Pair name for SSH"
-  default     = "hotel-booking-key"
-}
+

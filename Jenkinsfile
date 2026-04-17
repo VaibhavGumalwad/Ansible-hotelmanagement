@@ -3,20 +3,21 @@ pipeline {
 
     environment {
         AWS_REGION      = 'us-east-1'
-        ECR_REGISTRY    = credentials('ECR_REGISTRY')       // e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com
+        // ECR_REGISTRY is captured dynamically from terraform output after infra is created
         IMAGE_TAG       = "${BUILD_NUMBER}"
-        RDS_ENDPOINT    = credentials('RDS_ENDPOINT')       // from Terraform output
-        DB_USERNAME     = credentials('DB_USERNAME')
-        DB_PASSWORD     = credentials('DB_PASSWORD')
+        // These are used ONLY to pass into Terraform for RDS creation
+        TF_DB_USERNAME  = credentials('DB_USERNAME')
+        TF_DB_PASSWORD  = credentials('DB_PASSWORD')
+        // RDS_ENDPOINT, DB_USERNAME, DB_PASSWORD are captured dynamically from terraform output after infra is created
         JWT_SECRET      = credentials('JWT_SECRET')
-        APP_SERVER_IP   = credentials('APP_SERVER_IP')      // from Terraform output
+        // APP_SERVER_IP is captured dynamically from terraform output after infra is created
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/<your-username>/hotel-booking.git'
+                git branch: 'main', url: 'https://github.com/VaibhavGumalwad/Ansible-hotelmanagement.git'
             }
         }
 
@@ -32,6 +33,53 @@ pipeline {
             steps {
                 dir('hotel-booking-frontend') {
                     sh 'npm install && npm run build'
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('terraform/app-infra') {
+                    sh '''
+                        terraform init
+                        terraform plan -out=tfplan \
+                            -var="db_username=${TF_DB_USERNAME}" \
+                            -var="db_password=${TF_DB_PASSWORD}"
+                        terraform apply -auto-approve tfplan
+                    '''
+                    // Capture outputs dynamically from terraform
+                    script {
+                        env.APP_SERVER_IP = sh(
+                            script: 'terraform output -raw app_server_public_ip',
+                            returnStdout: true
+                        ).trim()
+                        env.RDS_ENDPOINT = sh(
+                            script: 'terraform output -raw rds_endpoint',
+                            returnStdout: true
+                        ).trim()
+                        env.DB_USERNAME = sh(
+                            script: 'terraform output -raw db_username',
+                            returnStdout: true
+                        ).trim()
+                        env.DB_PASSWORD = sh(
+                            script: 'terraform output -raw db_password',
+                            returnStdout: true
+                        ).trim()
+                        env.ECR_REGISTRY = sh(
+                            script: 'terraform output -raw ecr_registry',
+                            returnStdout: true
+                        ).trim()
+                        env.PRIVATE_KEY_PARAMETER = sh(
+                            script: 'terraform output -raw private_key_parameter',
+                            returnStdout: true
+                        ).trim()
+                        echo "App Server IP: ${env.APP_SERVER_IP}"
+                        echo "RDS Endpoint: ${env.RDS_ENDPOINT}"
+                        echo "DB Username: ${env.DB_USERNAME}"
+                        echo "DB Password: [HIDDEN]"
+                        echo "ECR Registry: ${env.ECR_REGISTRY}"
+                        echo "Private Key Parameter: ${env.PRIVATE_KEY_PARAMETER}"
+                    }
                 }
             }
         }
@@ -60,23 +108,35 @@ pipeline {
             }
         }
 
-        stage('Terraform Apply') {
+        stage('Setup SSH Key') {
             steps {
-                dir('terraform') {
-                    sh '''
-                        terraform init
-                        terraform plan -out=tfplan
-                        terraform apply -auto-approve tfplan
-                    '''
-                }
+                sh '''
+                    # Create .ssh directory if it doesn't exist
+                    mkdir -p ~/.ssh
+                    
+                    # Retrieve private key from Parameter Store
+                    aws ssm get-parameter --name "${PRIVATE_KEY_PARAMETER}" \
+                        --with-decryption --query 'Parameter.Value' --output text > ~/.ssh/hotel-booking-key.pem
+                    
+                    # Set correct permissions
+                    chmod 600 ~/.ssh/hotel-booking-key.pem
+                    
+                    echo "SSH key retrieved and configured successfully"
+                '''
             }
         }
 
         stage('Deploy with Ansible') {
             steps {
                 sh '''
-                    # Update inventory with actual IP
-                    sed -i "s/{{ APP_SERVER_IP }}/${APP_SERVER_IP}/g" ansible/inventory.ini
+                    # Overwrite inventory file dynamically with real IP from terraform output
+                    cat > ansible/inventory.ini <<EOF
+[app_servers]
+app_server ansible_host=${APP_SERVER_IP} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/hotel-booking-key.pem
+
+[jenkins]
+jenkins_server ansible_host=${APP_SERVER_IP} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/hotel-booking-key.pem
+EOF
 
                     # Run Ansible playbook
                     ansible-playbook -i ansible/inventory.ini ansible/deploy.yml \
@@ -105,7 +165,7 @@ pipeline {
 
     post {
         success {
-            echo "Deployment successful! App running at http://${APP_SERVER_IP}"
+            echo "Deployment successful! App running at http://${env.APP_SERVER_IP}"
         }
         failure {
             echo "Deployment failed! Check logs above."

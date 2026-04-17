@@ -46,9 +46,10 @@ Or run the SQL in MySQL Workbench.
 ```bash
 cd hotel-booking-backend
 
-# Update DB credentials in src/main/resources/application.properties
-# spring.datasource.username=root
-# spring.datasource.password=your_password
+# Set environment variables for database connection
+export DB_USERNAME=your_db_username
+export DB_PASSWORD=your_db_password
+export JWT_SECRET=your_jwt_secret_key_256_bits_minimum
 
 mvn spring-boot:run
 ```
