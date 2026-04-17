@@ -25,3 +25,8 @@ output "private_subnet_1_id" {
 output "private_subnet_2_id" {
   value = aws_subnet.private_2.id
 }
+
+output "jenkins_private_key_parameter" {
+  value = aws_ssm_parameter.jenkins_private_key.name
+  description = "SSM Parameter name containing Jenkins private key"
+}
