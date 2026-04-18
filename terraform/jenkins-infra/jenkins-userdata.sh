@@ -5,10 +5,26 @@ yum install -y docker git
 systemctl start docker
 systemctl enable docker
 
+# Install Java 21
+yum install -y java-21-amazon-corretto
+
+# Set Java 21 as default
+alternatives --install /usr/bin/java java /usr/lib/jvm/java-21-amazon-corretto/bin/java 1
+alternatives --set java /usr/lib/jvm/java-21-amazon-corretto/bin/java
+
+# Set JAVA_HOME
+echo 'export JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto' >> /etc/environment
+export JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto
+
 # Install Jenkins
 wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-yum install -y java-17-amazon-corretto jenkins
+yum install -y jenkins
+
+# Configure Jenkins to use Java 21
+echo 'JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto' >> /etc/sysconfig/jenkins
+echo 'JENKINS_JAVA_CMD=/usr/lib/jvm/java-21-amazon-corretto/bin/java' >> /etc/sysconfig/jenkins
+
 systemctl start jenkins
 systemctl enable jenkins
 usermod -aG docker jenkins
@@ -59,4 +75,7 @@ chmod 600 /home/ec2-user/.ssh/hotel-booking-key.pem
 chown jenkins:jenkins /var/lib/jenkins/.ssh/hotel-booking-key.pem
 chown ec2-user:ec2-user /home/ec2-user/.ssh/hotel-booking-key.pem
 
-echo "Jenkins setup completed with SSH key configured"
+# Verify Java version
+java -version
+
+echo "Jenkins setup completed with Java 21 and SSH key configured"
