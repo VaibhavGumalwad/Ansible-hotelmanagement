@@ -4,9 +4,6 @@ pipeline {
     environment {
         AWS_DEFAULT_REGION = 'us-east-1'
         AWS_REGION      = 'us-east-1'
-        // Maven configuration
-        M2_HOME = '/opt/maven'
-        PATH = "/opt/maven/bin:${env.PATH}"
         // ECR_REGISTRY is captured dynamically from terraform output after infra is created
         IMAGE_TAG       = "${BUILD_NUMBER}"
         // These are used ONLY to pass into Terraform for RDS creation
@@ -29,29 +26,9 @@ pipeline {
             steps {
                 dir('hotel-booking-backend') {
                     sh '''
-                        # Check if Maven 3.9.6 exists
-                        echo "Checking Maven installation..."
-                        ls -la /opt/
-                        
-                        # Check if Maven 3.9.6 binary exists
-                        if [ -f "/opt/maven/bin/mvn" ]; then
-                            echo "Using Maven 3.9.6:"
-                            /opt/maven/bin/mvn -version
-                            /opt/maven/bin/mvn clean package -DskipTests
-                        else
-                            echo "Maven 3.9.6 not found, installing it now..."
-                            sudo su - root -c "
-                                cd /opt
-                                wget -q https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
-                                tar xzf apache-maven-3.9.6-bin.tar.gz
-                                ln -sf apache-maven-3.9.6 maven
-                                chown -R jenkins:jenkins /opt/apache-maven-3.9.6
-                                chown -R jenkins:jenkins /opt/maven
-                            "
-                            echo "Maven 3.9.6 installed, now building:"
-                            /opt/maven/bin/mvn -version
-                            /opt/maven/bin/mvn clean package -DskipTests
-                        fi
+                        echo "Using Maven:"
+                        /opt/apache-maven-3.9.6/bin/mvn -version
+                        /opt/apache-maven-3.9.6/bin/mvn clean package -DskipTests
                     '''
                 }
             }
