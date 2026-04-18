@@ -40,50 +40,46 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                withCredentials([aws(credentialsId: 'aws-credentials', 
-                               accessKeyVariable: 'AWS_ACCESS_KEY_ID', 
-                               secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    dir('terraform/app-infra') {
-                        sh '''
-                            terraform init
-                            terraform plan -out=tfplan \
-                                -var="db_username=${TF_DB_USERNAME}" \
-                                -var="db_password=${TF_DB_PASSWORD}"
-                            terraform apply -auto-approve tfplan
-                        '''
-                        // Capture outputs dynamically from terraform
-                        script {
-                            env.APP_SERVER_IP = sh(
-                                script: 'terraform output -raw app_server_public_ip',
-                                returnStdout: true
-                            ).trim()
-                            env.RDS_ENDPOINT = sh(
-                                script: 'terraform output -raw rds_endpoint',
-                                returnStdout: true
-                            ).trim()
-                            env.DB_USERNAME = sh(
-                                script: 'terraform output -raw db_username',
-                                returnStdout: true
-                            ).trim()
-                            env.DB_PASSWORD = sh(
-                                script: 'terraform output -raw db_password',
-                                returnStdout: true
-                            ).trim()
-                            env.ECR_REGISTRY = sh(
-                                script: 'terraform output -raw ecr_registry',
-                                returnStdout: true
-                            ).trim()
-                            env.PRIVATE_KEY_FILE = sh(
-                                script: 'terraform output -raw private_key_file',
-                                returnStdout: true
-                            ).trim()
-                            echo "App Server IP: ${env.APP_SERVER_IP}"
-                            echo "RDS Endpoint: ${env.RDS_ENDPOINT}"
-                            echo "DB Username: ${env.DB_USERNAME}"
-                            echo "DB Password: [HIDDEN]"
-                            echo "ECR Registry: ${env.ECR_REGISTRY}"
-                            echo "Private Key File: ${env.PRIVATE_KEY_FILE}"
-                        }
+                dir('terraform/app-infra') {
+                    sh '''
+                        terraform init
+                        terraform plan -out=tfplan \
+                            -var="db_username=${TF_DB_USERNAME}" \
+                            -var="db_password=${TF_DB_PASSWORD}"
+                        terraform apply -auto-approve tfplan
+                    '''
+                    // Capture outputs dynamically from terraform
+                    script {
+                        env.APP_SERVER_IP = sh(
+                            script: 'terraform output -raw app_server_public_ip',
+                            returnStdout: true
+                        ).trim()
+                        env.RDS_ENDPOINT = sh(
+                            script: 'terraform output -raw rds_endpoint',
+                            returnStdout: true
+                        ).trim()
+                        env.DB_USERNAME = sh(
+                            script: 'terraform output -raw db_username',
+                            returnStdout: true
+                        ).trim()
+                        env.DB_PASSWORD = sh(
+                            script: 'terraform output -raw db_password',
+                            returnStdout: true
+                        ).trim()
+                        env.ECR_REGISTRY = sh(
+                            script: 'terraform output -raw ecr_registry',
+                            returnStdout: true
+                        ).trim()
+                        env.PRIVATE_KEY_FILE = sh(
+                            script: 'terraform output -raw private_key_file',
+                            returnStdout: true
+                        ).trim()
+                        echo "App Server IP: ${env.APP_SERVER_IP}"
+                        echo "RDS Endpoint: ${env.RDS_ENDPOINT}"
+                        echo "DB Username: ${env.DB_USERNAME}"
+                        echo "DB Password: [HIDDEN]"
+                        echo "ECR Registry: ${env.ECR_REGISTRY}"
+                        echo "Private Key File: ${env.PRIVATE_KEY_FILE}"
                     }
                 }
             }
@@ -100,20 +96,16 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                withCredentials([aws(credentialsId: 'aws-credentials', 
-                               accessKeyVariable: 'AWS_ACCESS_KEY_ID', 
-                               secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
-                        aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                sh '''
+                    aws ecr get-login-password --region ${AWS_REGION} | \
+                    docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
-                        docker tag hotel-booking-backend:${IMAGE_TAG} ${ECR_REGISTRY}/hotel-booking-backend:${IMAGE_TAG}
-                        docker tag hotel-booking-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/hotel-booking-frontend:${IMAGE_TAG}
+                    docker tag hotel-booking-backend:${IMAGE_TAG} ${ECR_REGISTRY}/hotel-booking-backend:${IMAGE_TAG}
+                    docker tag hotel-booking-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/hotel-booking-frontend:${IMAGE_TAG}
 
-                        docker push ${ECR_REGISTRY}/hotel-booking-backend:${IMAGE_TAG}
-                        docker push ${ECR_REGISTRY}/hotel-booking-frontend:${IMAGE_TAG}
-                    '''
-                }
+                    docker push ${ECR_REGISTRY}/hotel-booking-backend:${IMAGE_TAG}
+                    docker push ${ECR_REGISTRY}/hotel-booking-frontend:${IMAGE_TAG}
+                '''
             }
         }
 
