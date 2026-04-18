@@ -42,8 +42,19 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 ./aws/install
 
-# Install Maven
-yum install -y maven
+# Install Maven 3.9.x (compatible with Java 21 and Spring Boot 3.2)
+cd /opt
+wget https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
+tar xzf apache-maven-3.9.6-bin.tar.gz
+ln -s apache-maven-3.9.6 maven
+echo 'export M2_HOME=/opt/maven' >> /etc/environment
+echo 'export PATH=/opt/maven/bin:$PATH' >> /etc/environment
+export M2_HOME=/opt/maven
+export PATH=/opt/maven/bin:$PATH
+
+# Create Maven symlinks for system-wide access
+ln -sf /opt/maven/bin/mvn /usr/local/bin/mvn
+ln -sf /opt/maven/bin/mvn /usr/bin/mvn
 
 # Install Node.js
 curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
@@ -75,7 +86,8 @@ chmod 600 /home/ec2-user/.ssh/hotel-booking-key.pem
 chown jenkins:jenkins /var/lib/jenkins/.ssh/hotel-booking-key.pem
 chown ec2-user:ec2-user /home/ec2-user/.ssh/hotel-booking-key.pem
 
-# Verify Java version
+# Verify versions
 java -version
+mvn -version
 
-echo "Jenkins setup completed with Java 21 and SSH key configured"
+echo "Jenkins setup completed with Java 21, Maven 3.9.6, and SSH key configured"
