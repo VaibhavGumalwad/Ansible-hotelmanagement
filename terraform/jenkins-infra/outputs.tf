@@ -26,7 +26,7 @@ output "private_subnet_2_id" {
   value = aws_subnet.private_2.id
 }
 
-output "jenkins_private_key_parameter" {
-  value = aws_ssm_parameter.jenkins_private_key.name
-  description = "SSM Parameter name containing Jenkins private key"
+output "jenkins_private_key_file" {
+  value = "${path.module}/hotel-booking-key.pem"
+  description = "Path to Jenkins private key file"
 }

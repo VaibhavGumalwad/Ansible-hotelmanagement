@@ -27,6 +27,7 @@ output "key_pair_name" {
   value = aws_key_pair.hotel_booking_key.key_name
 }
 
-output "private_key_parameter" {
-  value = aws_ssm_parameter.private_key.name
+output "private_key_file" {
+  value = "${path.module}/hotel-booking-key.pem"
+  description = "Path to private key file"
 }

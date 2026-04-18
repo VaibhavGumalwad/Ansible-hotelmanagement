@@ -73,8 +73,8 @@ pipeline {
                                 script: 'terraform output -raw ecr_registry',
                                 returnStdout: true
                             ).trim()
-                            env.PRIVATE_KEY_PARAMETER = sh(
-                                script: 'terraform output -raw private_key_parameter',
+                            env.PRIVATE_KEY_FILE = sh(
+                                script: 'terraform output -raw private_key_file',
                                 returnStdout: true
                             ).trim()
                             echo "App Server IP: ${env.APP_SERVER_IP}"
@@ -82,7 +82,7 @@ pipeline {
                             echo "DB Username: ${env.DB_USERNAME}"
                             echo "DB Password: [HIDDEN]"
                             echo "ECR Registry: ${env.ECR_REGISTRY}"
-                            echo "Private Key Parameter: ${env.PRIVATE_KEY_PARAMETER}"
+                            echo "Private Key File: ${env.PRIVATE_KEY_FILE}"
                         }
                     }
                 }
@@ -119,23 +119,13 @@ pipeline {
 
         stage('Setup SSH Key') {
             steps {
-                withCredentials([aws(credentialsId: 'aws-credentials', 
-                               accessKeyVariable: 'AWS_ACCESS_KEY_ID', 
-                               secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
-                        # Create .ssh directory if it doesn't exist
-                        mkdir -p ~/.ssh
-                        
-                        # Retrieve private key from Parameter Store
-                        aws ssm get-parameter --name "${PRIVATE_KEY_PARAMETER}" \
-                            --with-decryption --query 'Parameter.Value' --output text > ~/.ssh/hotel-booking-key.pem
-                        
-                        # Set correct permissions
-                        chmod 600 ~/.ssh/hotel-booking-key.pem
-                        
-                        echo "SSH key retrieved and configured successfully"
-                    '''
-                }
+                sh '''
+                    # SSH key is already available from EC2 user_data setup
+                    # Just verify it exists and has correct permissions
+                    ls -la ~/.ssh/hotel-booking-key.pem
+                    chmod 600 ~/.ssh/hotel-booking-key.pem
+                    echo "SSH key verified and ready"
+                '''
             }
         }
 

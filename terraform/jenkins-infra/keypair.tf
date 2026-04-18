@@ -12,12 +12,9 @@ resource "aws_key_pair" "jenkins_key" {
   }
 }
 
-resource "aws_ssm_parameter" "jenkins_private_key" {
-  name  = "/${var.project_name}/jenkins-private-key"
-  type  = "SecureString"
-  value = tls_private_key.jenkins_key.private_key_pem
-
-  tags = {
-    Name = "${var.project_name}-jenkins-private-key"
-  }
+# Store private key in Jenkins server during user_data execution
+resource "local_file" "jenkins_private_key" {
+  content  = tls_private_key.jenkins_key.private_key_pem
+  filename = "${path.module}/hotel-booking-key.pem"
+  file_permission = "0600"
 }

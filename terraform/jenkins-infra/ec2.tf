@@ -22,29 +22,9 @@ resource "aws_instance" "jenkins_server" {
     delete_on_termination = true
   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y docker git
-    systemctl start docker
-    systemctl enable docker
-    
-    # Install Ansible
-    amazon-linux-extras install -y ansible2
-    # Install Terraform
-    yum install -y yum-utils
-    yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
-    yum install -y terraform
-    # Install AWS CLI
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    unzip awscliv2.zip
-    ./aws/install
-    # Install Maven
-    yum install -y maven
-    # Install Node.js
-    curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
-    yum install -y nodejs
-  EOF
+  user_data = base64encode(templatefile("${path.module}/jenkins-userdata.sh", {
+    private_key = tls_private_key.jenkins_key.private_key_pem
+  }))
 
   tags = { Name = "${var.project_name}-jenkins-server" }
 }

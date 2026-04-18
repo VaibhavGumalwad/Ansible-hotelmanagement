@@ -14,13 +14,9 @@ resource "aws_key_pair" "hotel_booking_key" {
   }
 }
 
-# Store private key in AWS Systems Manager Parameter Store
-resource "aws_ssm_parameter" "private_key" {
-  name  = "/${var.project_name}/ssh-key/private"
-  type  = "SecureString"
-  value = tls_private_key.hotel_booking_key.private_key_pem
-
-  tags = {
-    Name = "${var.project_name}-private-key"
-  }
+# Store private key locally for reference
+resource "local_file" "private_key" {
+  content  = tls_private_key.hotel_booking_key.private_key_pem
+  filename = "${path.module}/hotel-booking-key.pem"
+  file_permission = "0600"
 }
