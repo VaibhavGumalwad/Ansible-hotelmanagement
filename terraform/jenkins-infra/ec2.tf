@@ -21,7 +21,7 @@ resource "aws_instance" "jenkins_server" {
 
   root_block_device {
     volume_type = "gp3"
-    volume_size = 30
+    volume_size = 40
     encrypted   = true
     delete_on_termination = true
   }

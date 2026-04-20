@@ -1,9 +1,17 @@
 # Stage 1: Build React
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json .
-RUN npm install
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install dependencies with optimizations
+RUN npm ci --only=production --no-audit --no-fund
+
+# Copy source code
 COPY . .
+
+# Build the application
 RUN npm run build
 
 # Stage 2: Serve with Nginx

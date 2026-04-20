@@ -110,8 +110,16 @@ pipeline {
         stage('Docker Build') {
             steps {
                 sh '''
-                    docker build -t hotel-booking-backend:${IMAGE_TAG} ./hotel-booking-backend
-                    docker build -t hotel-booking-frontend:${IMAGE_TAG} ./hotel-booking-frontend
+                    # Clean up disk space before building
+                    docker system prune -f
+                    docker volume prune -f
+                    
+                    # Build with optimized Docker settings
+                    DOCKER_BUILDKIT=1 docker build --no-cache -t hotel-booking-backend:${IMAGE_TAG} ./hotel-booking-backend
+                    DOCKER_BUILDKIT=1 docker build --no-cache -t hotel-booking-frontend:${IMAGE_TAG} ./hotel-booking-frontend
+                    
+                    # Clean intermediate images
+                    docker image prune -f
                 '''
             }
         }
