@@ -2,6 +2,7 @@
 - name: Deploy Hotel Booking App
   hosts: app_servers
   become: yes
+  gather_facts: yes
 
   vars:
     ecr_registry: "{{ ecr_registry }}"
@@ -11,86 +12,201 @@
     db_password: "{{ db_password }}"
     jwt_secret: "{{ jwt_secret }}"
     aws_region: "us-east-1"
+    app_dir: "/opt/hotel-booking"
 
   tasks:
-    - name: Install Docker
-      yum:
-        name: docker
+    - name: Update system packages
+      dnf:
+        name: "*"
+        state: latest
+        update_cache: yes
+      tags: [system]
+
+    - name: Install required packages
+      dnf:
+        name:
+          - docker
+          - mysql
+          - curl
+          - unzip
         state: present
+      tags: [packages]
 
     - name: Start and enable Docker
       systemd:
         name: docker
         state: started
         enabled: yes
+      tags: [docker]
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+      tags: [docker]
+
+    - name: Check if Docker Compose is installed
+      stat:
+        path: /usr/local/bin/docker-compose
+      register: docker_compose_stat
+      tags: [docker-compose]
 
     - name: Install Docker Compose
       get_url:
         url: "https://github.com/docker/compose/releases/latest/download/docker-compose-Linux-x86_64"
         dest: /usr/local/bin/docker-compose
         mode: '0755'
+        owner: root
+        group: root
+      when: not docker_compose_stat.stat.exists
+      tags: [docker-compose]
+
+    - name: Create docker-compose symlink
+      file:
+        src: /usr/local/bin/docker-compose
+        dest: /usr/bin/docker-compose
+        state: link
+      tags: [docker-compose]
+
+    - name: Check if AWS CLI is installed
+      stat:
+        path: /usr/local/bin/aws
+      register: aws_cli_stat
+      tags: [aws-cli]
 
     - name: Install AWS CLI
       shell: |
+        cd /tmp
         curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
         unzip -o awscliv2.zip
         ./aws/install --update
-      args:
-        creates: /usr/local/bin/aws
+        rm -rf awscliv2.zip aws/
+      when: not aws_cli_stat.stat.exists
+      tags: [aws-cli]
 
-    - name: Install MySQL client for schema init
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      tags: [setup]
+
+    - name: Copy schema.sql to app server
+      copy:
+        src: ../../schema.sql
+        dest: "{{ app_dir }}/schema.sql"
+        mode: '0644'
+      tags: [database]
+
+    - name: Test database connectivity
       shell: |
-        yum install -y https://dev.mysql.com/get/mysql80-community-release-el7-5.noarch.rpm
-        yum install -y mysql-community-client
-      args:
-        creates: /usr/bin/mysql
+        mysql -h {{ rds_endpoint }} -u {{ db_username }} -p{{ db_password }} -e "SELECT 1;"
+      register: db_test
+      retries: 3
+      delay: 10
+      until: db_test.rc == 0
+      tags: [database]
+
+    - name: Initialize database schema
+      shell: |
+        mysql -h {{ rds_endpoint }} -u {{ db_username }} -p{{ db_password }} < {{ app_dir }}/schema.sql
+      register: schema_result
+      failed_when: schema_result.rc != 0 and "already exists" not in schema_result.stderr
+      tags: [database]
 
     - name: Login to ECR
       shell: |
         aws ecr get-login-password --region {{ aws_region }} | \
         docker login --username AWS --password-stdin {{ ecr_registry }}
-
-    - name: Create app directory
-      file:
-        path: /opt/hotel-booking
-        state: directory
-        mode: '0755'
-
-    - name: Copy schema.sql to app server
-      copy:
-        src: ../../schema.sql
-        dest: /opt/hotel-booking/schema.sql
-
-    - name: Run schema.sql against RDS
-      shell: |
-        mysql -h {{ rds_endpoint }} -u {{ db_username }} -p{{ db_password }} < /opt/hotel-booking/schema.sql
-      args:
-        executable: /bin/bash
+      register: ecr_login
+      retries: 3
+      delay: 5
+      until: ecr_login.rc == 0
+      tags: [ecr]
 
     - name: Copy docker-compose file
       template:
         src: docker-compose.yml.j2
-        dest: /opt/hotel-booking/docker-compose.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+        mode: '0644'
+        backup: yes
+      register: compose_file
+      tags: [deploy]
 
     - name: Pull latest Docker images
       shell: |
-        cd /opt/hotel-booking
+        cd {{ app_dir }}
         docker-compose pull
+      register: pull_result
+      retries: 3
+      delay: 10
+      until: pull_result.rc == 0
+      tags: [deploy]
 
-    - name: Stop existing containers
+    - name: Stop existing containers gracefully
       shell: |
-        cd /opt/hotel-booking
-        docker-compose down || true
+        cd {{ app_dir }}
+        docker-compose down --timeout 30 || true
+      tags: [deploy]
+
+    - name: Remove old containers and images
+      shell: |
+        docker container prune -f
+        docker image prune -f
+      tags: [cleanup]
 
     - name: Start containers
       shell: |
-        cd /opt/hotel-booking
-        docker-compose up -d
+        cd {{ app_dir }}
+        docker-compose up -d --remove-orphans
+      register: start_result
+      tags: [deploy]
+
+    - name: Wait for backend to be healthy
+      uri:
+        url: "http://localhost:8080/api/hotels/all"
+        method: GET
+        status_code: [200, 401]  # 401 is OK (no auth token)
+      register: backend_health
+      retries: 30
+      delay: 10
+      until: backend_health.status in [200, 401]
+      tags: [health-check]
+
+    - name: Wait for frontend to be healthy
+      uri:
+        url: "http://localhost:3000"
+        method: GET
+        status_code: 200
+      register: frontend_health
+      retries: 15
+      delay: 10
+      until: frontend_health.status == 200
+      tags: [health-check]
 
     - name: Verify containers are running
-      shell: docker ps
+      shell: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
       register: docker_status
+      tags: [verify]
 
     - name: Show running containers
       debug:
-        msg: "{{ docker_status.stdout }}"
+        msg: "{{ docker_status.stdout_lines }}"
+      tags: [verify]
+
+    - name: Show container logs (last 20 lines)
+      shell: |
+        echo "=== Backend Logs ==="
+        docker logs --tail 20 hotel-backend || true
+        echo "=== Frontend Logs ==="
+        docker logs --tail 20 hotel-frontend || true
+      register: container_logs
+      tags: [logs]
+
+    - name: Display container logs
+      debug:
+        msg: "{{ container_logs.stdout_lines }}"
+      tags: [logs]

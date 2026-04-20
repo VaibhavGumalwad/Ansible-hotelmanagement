@@ -12,6 +12,12 @@ services:
       - SPRING_DATASOURCE_PASSWORD={{ db_password }}
       - JWT_SECRET={{ jwt_secret }}
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/hotels/all"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - hotel-network
 
@@ -23,8 +29,15 @@ services:
     environment:
       - REACT_APP_API_URL=http://{{ ansible_default_ipv4.address }}:8080/api
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - hotel-network
 
