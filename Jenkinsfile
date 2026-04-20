@@ -58,6 +58,13 @@ pipeline {
                 dir('terraform/app-infra') {
                     sh '''
                         terraform init
+                        
+                        # Destroy existing infrastructure first
+                        terraform destroy -auto-approve \
+                            -var="db_username=${TF_DB_USERNAME}" \
+                            -var="db_password=${TF_DB_PASSWORD}" || true
+                        
+                        # Apply fresh infrastructure
                         terraform plan -out=tfplan \
                             -var="db_username=${TF_DB_USERNAME}" \
                             -var="db_password=${TF_DB_PASSWORD}"
