@@ -17,8 +17,9 @@ Full-stack hotel booking application built with React, Spring Boot, and MySQL.
 
 ## Tech Stack
 - **Frontend**: React 18, React Router v6, Axios, Tailwind CSS
-- **Backend**: Spring Boot 3.2, Spring Security, JWT, Spring Data JPA
+- **Backend**: Spring Boot 3.1.5, Spring Security, JWT, Spring Data JPA
 - **Database**: MySQL 8
+- **Runtime**: Java 21, Node.js 20 LTS, Maven 3.9.6
 
 ## Project Structure
 ```
@@ -31,10 +32,10 @@ Ansible-project/
 ## Setup Instructions
 
 ### Prerequisites
-- Java 17+
-- Node.js 18+
+- Java 21+
+- Node.js 20+
 - MySQL 8+
-- Maven 3.8+
+- Maven 3.9.6+
 
 ### 1. Database Setup
 ```sql

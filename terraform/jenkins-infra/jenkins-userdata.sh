@@ -73,8 +73,8 @@ ln -sf /opt/maven/bin/mvn /usr/bin/mvn
 # Clean up Maven archive
 rm -f /opt/apache-maven-3.9.6-bin.tar.gz
 
-# Install Node.js 18 LTS
-curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+# Install Node.js 20 LTS
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
 dnf install -y nodejs
 
 # Wait for Jenkins user to be created
