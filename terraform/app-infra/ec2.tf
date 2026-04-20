@@ -28,8 +28,8 @@ resource "aws_instance" "app_server" {
 
   user_data = <<-EOF
     #!/bin/bash
-    yum update -y
-    yum install -y docker mysql
+    dnf update -y
+    dnf install -y docker mysql
     systemctl start docker
     systemctl enable docker
     usermod -aG docker ec2-user
