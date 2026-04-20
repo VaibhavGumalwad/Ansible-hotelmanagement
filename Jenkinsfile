@@ -37,7 +37,18 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('hotel-booking-frontend') {
-                    sh 'npm install && npm run build'
+                    sh '''
+                        # Fix npm permissions and clean install
+                        rm -rf node_modules package-lock.json
+                        npm cache clean --force
+                        npm install
+                        
+                        # Fix executable permissions
+                        chmod +x node_modules/.bin/*
+                        
+                        # Build the project
+                        npm run build
+                    '''
                 }
             }
         }
